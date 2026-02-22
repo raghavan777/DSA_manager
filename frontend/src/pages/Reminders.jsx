@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import Navbar from "../components/Navbar";
 import { getUserProfile, updateStreak, updateNotificationSettings } from "../services/api";
+import { startNotificationScheduler, stopNotificationScheduler } from "../utils/notificationScheduler";
 import "./Reminders.css";
 
 const Reminders = () => {
@@ -20,7 +21,16 @@ const Reminders = () => {
                 setUserName(res.data.name || "Student");
                 setStreak(res.data.streak || 0);
                 if (res.data.notificationTime) setTime(res.data.notificationTime);
-                if (res.data.notificationEnabled) setNotifEnabled(true);
+                if (res.data.notificationEnabled) {
+                    setNotifEnabled(true);
+                    // Re-arm scheduler on page load if notifications are enabled
+                    if (Notification.permission === "granted") {
+                        startNotificationScheduler(
+                            res.data.notificationTime,
+                            res.data.name || "Student"
+                        );
+                    }
+                }
 
                 if (res.data.lastStudiedDate) {
                     const lastDate = new Date(res.data.lastStudiedDate);
@@ -85,6 +95,8 @@ const Reminders = () => {
             try {
                 await updateNotificationSettings({ time, enabled: true });
                 setNotifEnabled(true);
+                // Start the scheduler immediately
+                startNotificationScheduler(time, userName);
                 alert(`Daily notification activated for ${time} ⏰`);
             } catch (error) {
                 console.error("Failed to save notification settings", error);
@@ -99,6 +111,7 @@ const Reminders = () => {
         try {
             await updateNotificationSettings({ enabled: false });
             setNotifEnabled(false);
+            stopNotificationScheduler();
             alert("Daily notifications disabled 🔕");
         } catch (error) {
             console.error("Failed to disable notifications", error);
